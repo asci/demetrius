@@ -1,0 +1,187 @@
+class Sprite
+  constructor: (@image, col, row, width, height) ->
+    @sx = col * width
+    @sy = row * height
+    @sWidth = width
+    @sHeight = height
+    @dWidth = width
+    @dHeight = height
+    @x = 0
+    @y = 0
+    @dx = 0
+    @dy = 0
+class Animation
+  constructor: (@image, @frameWidth, @frameCount) ->
+    @sWidth = frameWidth
+    @sHeight = image.height
+    @dWidth = frameWidth
+    @dHeight = image.height
+    @i = 0
+    @sx = 0
+    @sy = 0
+    @dx = 0
+    @dy = 0
+    @x = 0
+    @y = 0
+    @animateTimer = 0
+  start: ->
+    clearInterval @animateTimer 
+    setInterval( ->
+      @animate()
+      true
+    , 30)
+    true
+  stop: ->
+    clearInterval @animateTimer
+    true
+  animate: ->
+    if @i < @frameCount then @i++ else @i = 0
+    @sx = @i * @frameWidth
+    true
+    
+class Tile
+  constructor: (@mapX, @mapY) ->
+    @x = 0
+    @y = 0
+    @land = null
+    @lanscape = null
+$().ready ->
+  app = ->
+    buffer = document.createElement("canvas")
+    canvas = $("#app")[0]
+    ctx = buffer.getContext("2d")
+    canvas.ctx = canvas.getContext("2d")
+    zoom = 1
+    queue = []
+    started = false
+    drag = false
+    timer = 0
+    width = 0
+    height = 0
+    field = {}
+    loader = {}
+    lastEvent = null
+    tick = new Date().getTime()
+    setSize = (w, h) ->
+      width = w
+      height = h
+      canvas.width = width
+      canvas.height = height
+      buffer.width = width
+      buffer.height = height
+      true
+    setSize(760, 600)
+    resources = {}
+    class Field
+      constructor: (@mapWidth, @mapHeight, @tileWidth, @tileHeight, @tileOffset) ->
+        @x = 500
+        @y = 1000
+        @tiles = []
+        for i in [0..@mapWidth]
+          @tiles[i] = []
+          for j in [0..@mapHeight]
+            tile = new Tile(i, j, 0, 0)
+            tile.x = (i - j) * (@tileHeight - @tileOffset) + ((@mapWidth / 2) * @tileWidth);
+            tile.y = (i + j) * (@tileHeight - @tileOffset) / 2;
+            tile.land = new Sprite(resources['LAND'], Math.round(Math.random() * 6), Math.round(Math.random()), @tileWidth, @tileHeight)
+            @tiles[i][j] = tile
+        
+    loadResource = (res, path) ->
+      addToResourceQueue res
+      resources[res] = new Image()
+      resources[res].onload = ->
+        removeFromResourceQueue res
+      resources[res].src = path;
+      true
+    addToResourceQueue = (res) ->
+      queue.push res
+      true
+    removeFromResourceQueue = (res) ->
+      queue.splice(queue.indexOf(res), 1);
+      startApp() if queue.length is 0 and !started
+      true
+    drawRect = (x, y, w, h, fill, stroke, border) ->
+      ctx.save()
+      ctx.translate(x + border, y + border)
+      ctx.fillStyle = fill
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = border
+      ctx.fillRect(0, 0, w - border * 2, h - border * 2)
+      ctx.strokeRect(0, 0, w - border * 2, h - border * 2)
+      ctx.restore()
+      true
+    drawSprite = (x, y, spr) ->
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.drawImage(spr.image, spr.sx, spr.sy, spr.sWidth, spr.sHeight, spr.dx, spr.dy, spr.dWidth, spr.dHeight)
+      ctx.restore()
+      true
+    $('#app').mousedown (e) ->
+      x = e.clientX - @offsetLeft
+      y = e.clientY - @offsetTop
+      lastEvent = e 
+      tick = new Date().getTime(); 
+      true
+    $('#app').mouseup (e) ->
+      x = e.clientX - @offsetLeft
+      y = e.clientY - @offsetTop
+      if drag
+        drag = false
+        tick = new Date().getTime() + 10000000
+        return true
+      true
+    $('#app').mousemove (e) ->
+      x = e.clientX - @offsetLeft
+      y = e.clientY - @offsetTop
+      drag = true if new Date().getTime() - tick > 175
+      if drag
+        mapMove(x, y)
+        lastEvent = e
+        return true
+      true
+    mapMove = (x, y) ->
+      lastX = lastEvent.clientX - canvas.offsetLeft;
+      lastY = lastEvent.clientY - canvas.offsetTop;
+      if field.x + (lastX - x) < field.tileHeight
+        field.x = field.tileHeight
+      else if field.x + (lastX - x) > field.mapWidth * field.tileWidth - width
+        field.x = field.mapWidth * field.tileWidth - width
+      else
+        field.x += lastX - x
+      if field.y + (lastY - y) < 0
+        field.y = 0
+      else if field.y + (lastY - y) > field.mapHeight * field.tileHeight - height
+        field.y = field.mapHeight * field.tileHeight - height
+      else
+        field.y += lastY - y
+      true    
+    startApp = ->
+      field = new Field(100, 100, 64, 64, 33)
+      console.dir field.tiles[2][3]
+      clearInterval(timer)
+      setInterval(onFrame, 60)
+      true
+    onFrame = ->
+      ctx.clearRect(0, 0, width, height)
+      ctx.save()
+      ctx.scale(zoom, zoom)
+      i = 0
+      while i < field.mapWidth
+        j = 0
+        while j < field.mapHeight
+          if field.tiles[i][j].x - field.x > -field.tileWidth and
+          field.tiles[i][j].x - field.x < width and
+          field.tiles[i][j].y - field.y > -field.tileHeight and
+          field.tiles[i][j].y - field.y < height
+            drawSprite(field.tiles[i][j].x - field.x, field.tiles[i][j].y - field.y, field.tiles[i][j].land)
+          j++
+        i++
+      ctx.restore()
+      canvas.ctx.clearRect(0, 0, width, height)
+      canvas.ctx.drawImage(buffer, 0, 0)
+      true
+    loadResource('LAND', './images/landscape.png')
+    loadResource('ANIM_LOADER', './images/loader.png')
+    console.log 'After loadResousce'
+    true
+  app()
