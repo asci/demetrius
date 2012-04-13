@@ -1,1 +1,2 @@
 This is simple and ugly isometric (dimetric) game engine on Javascript. Its using canvas to render graphic and DOM to show user interface
+Demo: http://dl.dropbox.com/u/1386461/demetrius/app.html
